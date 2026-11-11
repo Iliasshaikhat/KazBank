@@ -3,7 +3,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from dotenv import load_dotenv
-from flask import Flask
+from flask import Flask, send_from_directory
 from flask.json.provider import DefaultJSONProvider
 
 from . import db
@@ -33,4 +33,10 @@ def create_app(database_url: str | None = None) -> Flask:
 
     from .routes import bp
     app.register_blueprint(bp)
+
+    @app.get("/")
+    def index():
+        # Simple web UI that talks to the JSON API (the API itself is unchanged).
+        return send_from_directory(app.static_folder, "index.html")
+
     return app

@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KazBank</title>
+<style>
+  :root{
+    --bg:#f4f6fb; --card:#ffffff; --text:#1c2333; --muted:#6b7488; --line:#e3e7f0;
+    --brand:#0f766e; --brand2:#14b8a6; --danger:#dc2626; --ok:#16a34a; --shadow:0 4px 18px rgba(20,30,60,.07);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#0e1320; --card:#161d2e; --text:#e7ecf6; --muted:#8f9ab3; --line:#26304a; --shadow:0 4px 18px rgba(0,0,0,.35); }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text)}
+  header{background:linear-gradient(120deg,var(--brand),var(--brand2));color:#fff;padding:22px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+  header h1{margin:0;font-size:24px;letter-spacing:.3px}
+  header small{opacity:.85;display:block;font-size:13px;margin-top:2px}
+  .pill{background:rgba(255,255,255,.18);padding:7px 14px;border-radius:999px;font-size:13px;display:flex;align-items:center;gap:8px}
+  .dot{width:9px;height:9px;border-radius:50%;background:#facc15}
+  .dot.ok{background:#4ade80} .dot.bad{background:#f87171}
+  main{max-width:1100px;margin:0 auto;padding:24px 18px 60px}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:22px}
+  .stat{background:var(--card);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow)}
+  .stat span{color:var(--muted);font-size:13px}
+  .stat b{display:block;font-size:26px;margin-top:4px}
+  nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  nav button{border:1px solid var(--line);background:var(--card);color:var(--text);padding:9px 18px;border-radius:999px;cursor:pointer;font-size:14px}
+  nav button.active{background:var(--brand);color:#fff;border-color:var(--brand)}
+  section{display:none;background:var(--card);border-radius:14px;padding:20px;box-shadow:var(--shadow)}
+  section.active{display:block}
+  h2{margin:0 0 14px;font-size:18px}
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+  input,select{padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--text);font-size:14px;min-width:0}
+  button.primary{background:var(--brand);color:#fff;border:0;padding:10px 18px;border-radius:9px;cursor:pointer;font-size:14px}
+  button.primary:hover{background:#0b5f58}
+  button.link{background:none;border:0;color:var(--brand);cursor:pointer;font-size:13px;padding:0}
+  .tablewrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th{text-align:left;color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.5px;padding:8px 10px;border-bottom:1px solid var(--line)}
+  td{padding:10px;border-bottom:1px solid var(--line)}
+  tr:last-child td{border-bottom:0}
+  .num{text-align:right;font-variant-numeric:tabular-nums}
+  .badge{padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600}
+  .debit{background:rgba(220,38,38,.12);color:var(--danger)} .credit{background:rgba(22,163,74,.13);color:var(--ok)}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;max-width:760px}
+  .grid2 label{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:5px}
+  .empty{color:var(--muted);padding:18px 4px}
+  #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(30px);opacity:0;background:#1f2937;color:#fff;padding:12px 20px;border-radius:10px;transition:.25s;font-size:14px;max-width:90vw;z-index:9}
+  #toast.show{opacity:1;transform:translateX(-50%)}
+  #toast.err{background:var(--danger)} #toast.good{background:var(--ok)}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>🏦 KazBank</h1><small>Transaction API · Flask + PostgreSQL</small></div>
+  <div class="pill"><span class="dot" id="dot"></span><span id="healthText">проверка…</span></div>
+</header>
+
+<main>
+  <div class="stats">
+    <div class="stat"><span>Клиенты</span><b id="sCustomers">–</b></div>
+    <div class="stat"><span>Счета</span><b id="sAccounts">–</b></div>
+    <div class="stat"><span>Всего денег в банке</span><b id="sTotal">–</b></div>
+  </div>
+
+  <nav id="tabs">
+    <button data-tab="customers" class="active">Клиенты</button>
+    <button data-tab="accounts">Счета</button>
+    <button data-tab="transfer">Перевод</button>
+    <button data-tab="history">История</button>
+  </nav>
+
+  <section id="customers" class="active">
+    <h2>Клиенты</h2>
+    <div class="toolbar">
+      <select id="cityFilter"><option value="">Все города</option></select>
+    </div>
+    <div class="tablewrap"><table><thead><tr><th>ID</th><th>Имя</th><th>Город</th><th>Email</th><th></th></tr></thead><tbody id="customersBody"></tbody></table></div>
+    <h2 style="margin-top:26px">Новый клиент</h2>
+    <div class="grid2">
+      <label>Имя<input id="newName" placeholder="Aliya Nur"></label>
+      <label>Город<input id="newCity" placeholder="Almaty"></label>
+      <label>Email<input id="newEmail" placeholder="aliya@example.com"></label>
+    </div>
+    <p><button class="primary" id="addCustomer">Добавить</button></p>
+  </section>
+
+  <section id="accounts">
+    <h2>Счета</h2>
+    <div class="toolbar"><select id="accOwner"><option value="">Все клиенты</option></select></div>
+    <div class="tablewrap"><table><thead><tr><th>ID</th><th>Владелец</th><th>Номер счета</th><th class="num">Баланс, ₸</th></tr></thead><tbody id="accountsBody"></tbody></table></div>
+  </section>
+
+  <section id="transfer">
+    <h2>Перевод между счетами</h2>
+    <div class="grid2">
+      <label>Откуда<select id="fromAcc"></select></label>
+      <label>Куда<select id="toAcc"></select></label>
+      <label>Сумма, ₸<input id="amount" type="number" min="0.01" step="0.01" placeholder="1500.50"></label>
+    </div>
+    <p><button class="primary" id="doTransfer">Перевести</button></p>
+    <div id="transferResult" class="empty"></div>
+  </section>
+
+  <section id="history">
+    <h2>История операций</h2>
+    <div class="toolbar"><select id="histAcc"></select></div>
+    <div class="tablewrap"><table><thead><tr><th>№</th><th>Тип</th><th class="num">Сумма, ₸</th><th>Связанный счет</th><th>Описание</th><th>Дата</th></tr></thead><tbody id="historyBody"></tbody></table></div>
+  </section>
+</main>
+<div id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = n => Number(n).toLocaleString("ru-RU", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+let customers = [], accounts = [];
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  let d = null; try { d = await r.json(); } catch {}
+  if (!r.ok) throw new Error((d && d.error) || ("HTTP " + r.status));
+  return d;
+}
+function toast(msg, kind) {
+  const t = $("#toast"); t.textContent = msg; t.className = "show " + (kind || "");
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.className = "", 3200);
+}
+const owner = id => (customers.find(c => c.customer_id === id) || {}).full_name || ("#" + id);
+
+function showTab(name) {
+  document.querySelectorAll("section").forEach(s => s.classList.toggle("active", s.id === name));
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
+  if (name === "history") loadHistory();
+}
+$("#tabs").addEventListener("click", e => { if (e.target.dataset.tab) showTab(e.target.dataset.tab); });
+
+async function loadAll() {
+  [customers, accounts] = await Promise.all([api("/customers"), api("/accounts")]);
+  renderStats(); renderCustomers(); renderAccounts(); fillSelects();
+}
+function renderStats() {
+  $("#sCustomers").textContent = customers.length;
+  $("#sAccounts").textContent = accounts.length;
+  $("#sTotal").textContent = fmt(accounts.reduce((s, a) => s + Number(a.balance), 0)) + " ₸";
+}
+function renderCustomers() {
+  const city = $("#cityFilter").value;
+  const cities = [...new Set(customers.map(c => c.city).filter(Boolean))].sort();
+  $("#cityFilter").innerHTML = '<option value="">Все города</option>' +
+    cities.map(c => `<option ${c === city ? "selected" : ""}>${esc(c)}</option>`).join("");
+  const rows = customers.filter(c => !city || c.city === city);
+  $("#customersBody").innerHTML = rows.length ? rows.map(c => `
+    <tr><td>${c.customer_id}</td><td>${esc(c.full_name)}</td><td>${esc(c.city)}</td><td>${esc(c.email)}</td>
+    <td><button class="link" data-owner="${c.customer_id}">счета →</button></td></tr>`).join("")
+    : '<tr><td colspan="5" class="empty">Нет клиентов</td></tr>';
+}
+function renderAccounts() {
+  const sel = $("#accOwner").value;
+  $("#accOwner").innerHTML = '<option value="">Все клиенты</option>' +
+    customers.map(c => `<option value="${c.customer_id}" ${String(c.customer_id) === sel ? "selected" : ""}>${esc(c.full_name)}</option>`).join("");
+  const rows = accounts.filter(a => !sel || String(a.customer_id) === sel);
+  $("#accountsBody").innerHTML = rows.length ? rows.map(a => `
+    <tr><td>${a.account_id}</td><td>${esc(owner(a.customer_id))}</td><td>${esc(a.account_number)}</td><td class="num">${fmt(a.balance)}</td></tr>`).join("")
+    : '<tr><td colspan="4" class="empty">Нет счетов</td></tr>';
+}
+function fillSelects() {
+  const opt = a => `<option value="${a.account_id}">#${a.account_id} · ${esc(owner(a.customer_id))} · ${fmt(a.balance)} ₸</option>`;
+  const keep = (el, html) => { const v = el.value; el.innerHTML = html; if (v) el.value = v; };
+  keep($("#fromAcc"), accounts.map(opt).join(""));
+  keep($("#toAcc"), accounts.map(opt).join(""));
+  if ($("#toAcc").selectedIndex === $("#fromAcc").selectedIndex && accounts.length > 1) $("#toAcc").selectedIndex = 1;
+  keep($("#histAcc"), accounts.map(opt).join(""));
+}
+async function loadHistory() {
+  const id = $("#histAcc").value; if (!id) return;
+  try {
+    const rows = await api("/transactions?account_id=" + id);
+    $("#historyBody").innerHTML = rows.length ? rows.map(t => `
+      <tr><td>${t.tx_id}</td><td><span class="badge ${t.tx_type}">${t.tx_type === "debit" ? "списание" : "зачисление"}</span></td>
+      <td class="num">${fmt(t.amount)}</td><td>${t.related_account_id ? "#" + t.related_account_id : "—"}</td>
+      <td>${esc(t.description)}</td><td>${new Date(t.created_at).toLocaleString("ru-RU")}</td></tr>`).join("")
+      : '<tr><td colspan="6" class="empty">Операций пока нет</td></tr>';
+  } catch (e) { toast(e.message, "err"); }
+}
+async function loadHealth() {
+  try {
+    const h = await api("/health"), p = h.pool;
+    $("#dot").className = "dot ok";
+    $("#healthText").textContent = `БД онлайн · пул ${p.pool_size}/${p.pool_max}`;
+  } catch (e) { $("#dot").className = "dot bad"; $("#healthText").textContent = "БД недоступна"; }
+}
+
+$("#cityFilter").addEventListener("change", renderCustomers);
+$("#accOwner").addEventListener("change", renderAccounts);
+$("#histAcc").addEventListener("change", loadHistory);
+$("#customersBody").addEventListener("click", e => {
+  const id = e.target.dataset.owner; if (!id) return;
+  $("#accOwner").value = id; renderAccounts(); showTab("accounts");
+});
+$("#addCustomer").addEventListener("click", async () => {
+  try {
+    const body = {full_name: $("#newName").value || null, city: $("#newCity").value || null, email: $("#newEmail").value || null};
+    const c = await api("/customers", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+    toast("Клиент «" + c.full_name + "» добавлен", "good");
+    ["#newName", "#newCity", "#newEmail"].forEach(s => $(s).value = "");
+    await loadAll();
+  } catch (e) { toast(e.message, "err"); }
+});
+$("#doTransfer").addEventListener("click", async () => {
+  const body = {from_account: Number($("#fromAcc").value), to_account: Number($("#toAcc").value), amount: $("#amount").value === "" ? null : Number($("#amount").value)};
+  try {
+    const r = await api("/transfer", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+    toast("Перевод выполнен: " + fmt(r.amount) + " ₸", "good");
+    $("#transferResult").innerHTML = `Новый баланс отправителя: <b>${fmt(r.from_balance)} ₸</b>, получателя: <b>${fmt(r.to_balance)} ₸</b>`;
+    $("#amount").value = "";
+    await loadAll();
+  } catch (e) { toast(e.message, "err"); $("#transferResult").textContent = ""; }
+});
+
+loadAll().catch(e => toast(e.message, "err"));
+loadHealth(); setInterval(loadHealth, 10000);
+</script>
+</body>
+</html>
